@@ -1,0 +1,1 @@
+This package allows to read and write JavaScript AST's in the Mozilla SpiderMonkey Parser API format (https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Parser_API)
