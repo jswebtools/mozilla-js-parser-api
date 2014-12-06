@@ -24,15 +24,20 @@ import Data.Map.Strict (Map)
 data SourceLocation = SourceLocation {source :: Maybe String
                                      ,start :: Position
                                      ,end :: Position}
+                    | NoLocation
                     deriving (Eq, Show)
+
+instance FromJSON SourceLocation where
+  parseJSON (Object o) = SourceLocation <$>
+                         o .: "source" <*>
+                         o .: "start" <*>
+                         o .: "end"
+  parseJSON Null       = pure NoLocation
 
 data Position = Position {line :: Int32
                          ,column :: Int32
                          }
                 deriving (Eq, Show)
-
-
-$(deriveJSON defaultOptions ''SourceLocation)
 
 $(deriveJSON defaultOptions ''Position)
 
