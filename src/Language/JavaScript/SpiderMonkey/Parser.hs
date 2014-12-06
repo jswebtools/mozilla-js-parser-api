@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -63,9 +61,6 @@ cases nds = \v -> case v of
 node :: String -> (SourceLocation -> f) -> Node f
 node name ctor = Node name $ ctor <$> getLocation
 
-single :: String -> (SourceLocation -> f) -> (Value -> Parser f)
-single name ctor = cases [node name ctor]
-
 liftJSON :: (FromJSON a) => Node a
 liftJSON = Node {nodeType = ""
                 ,nodeBuilder = do o <- ask
@@ -81,12 +76,8 @@ field name = Node {nodeType = ""
                   ,nodeBuilder = do o <- ask
                                     lift (o .: name)}
 
--- instance FromJSON a => IsString (Node (Maybe a)) where
---   fromString s = field (fromString s)
-
 instance FromJSON a => IsString (Node a) where
   fromString s = field (fromString s)
-
 
 matchType :: String -> [Node a] -> Maybe (Node a)
 matchType type_ = safeHead . filter (\n -> type_ == nodeType n)
@@ -102,7 +93,7 @@ getLocation = ask >>= \o -> lift (o .: "loc")
 data Program = Program SourceLocation [Statement]
 
 instance FromJSON Program where
-  parseJSON = single "Program" $ Program <*> "body"
+  parseJSON = cases [node "Program" Program <*> "body"]
   
 data Function = Function {funcId :: Maybe Identifier
                          ,funcParams :: [Pattern]
@@ -190,7 +181,7 @@ instance FromJSON VariableDeclaration where
 data VariableDeclarator = VariableDeclarator SourceLocation Pattern (Maybe Expression)
 
 instance FromJSON VariableDeclarator where
-  parseJSON = single "VariableDeclarator" $ VariableDeclarator <*> "id" <*> "init"
+  parseJSON = cases [node "VariableDeclarator" VariableDeclarator <*> "id" <*> "init"]
 
 data DeclarationKind = DVar | DLet | DConst
 
@@ -271,22 +262,22 @@ instance FromJSON PatternProperty where
 data SwitchCase = SwitchCase SourceLocation (Maybe Expression) [Statement]
 
 instance FromJSON SwitchCase where
-  parseJSON = single "SwitchCase" $ SwitchCase <*> "test" <*> "consequent"
+  parseJSON = cases [node "SwitchCase" SwitchCase <*> "test" <*> "consequent"]
 
 data CatchClause = CatchClause SourceLocation Pattern (Maybe Expression) [Statement]
 
 instance FromJSON CatchClause where
-  parseJSON = single "CatchClause" $ CatchClause <*> "param" <*> "guard" <*> "body"
+  parseJSON = cases [node "CatchClause" CatchClause <*> "param" <*> "guard" <*> "body"]
 
 data ComprehensionBlock = ComprehensionBlock SourceLocation Pattern Expression Bool
 
 instance FromJSON ComprehensionBlock where
-  parseJSON = single "ComprehensionBlock" $ ComprehensionBlock <*> "left" <*> "right" <*> "each"
+  parseJSON = cases [node "ComprehensionBlock" ComprehensionBlock <*> "left" <*> "right" <*> "each"]
 
 data Identifier = Identifier SourceLocation Text
 
 instance FromJSON Identifier where
-  parseJSON = single "Identifier" $ Identifier <*> "name"
+  parseJSON = cases [node "Identifier" Identifier <*> "name"]
 
 data Literal = LString SourceLocation Text
              | LBool SourceLocation Bool
