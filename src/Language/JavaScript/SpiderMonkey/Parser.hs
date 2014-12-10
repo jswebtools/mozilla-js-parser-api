@@ -41,7 +41,7 @@ instance FromJSON SourceLocation where
 data Position = Position {line :: Int32
                          ,column :: Int32
                          }
-                deriving (Eq, Show)
+              deriving (Eq, Show)
 
 $(deriveJSON defaultOptions ''Position)
 
@@ -100,6 +100,7 @@ getLocation :: Builder SourceLocation
 getLocation = ask >>= \o -> lift (o .: "loc")
   
 data Program = Program { loc :: SourceLocation, body :: [Statement] }
+             deriving (Eq, Show)
 
 instance FromJSON Program where
   parseJSON (Object o') = p' o'
@@ -117,6 +118,7 @@ data Function = Function {funcId :: Maybe Identifier
                           -- See: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Parser_API#Functions
                          ,funcBody :: [Statement] 
                          ,funcGenerator :: Bool}
+              deriving (Eq, Show)
 
 instance FromJSON Function where
   parseJSON (Object o) = Function <$>
@@ -149,6 +151,7 @@ data Statement = EmptyStatement SourceLocation
                | DebuggerStatement SourceLocation
                | FunctionDeclarationStatement SourceLocation Function
                | VariableDeclarationStatement SourceLocation VariableDeclaration
+               deriving (Eq, Show)
 
 instance FromJSON Statement where
   parseJSON = parse'
@@ -180,6 +183,7 @@ instance FromJSON Statement where
 data ForInit = VarInit VariableDeclaration
              | ExprInit Expression
              | NoInit
+             deriving (Eq, Show)
 
 instance FromJSON ForInit where
   parseJSON v = case v of
@@ -190,17 +194,20 @@ instance FromJSON ForInit where
                    
 
 data VariableDeclaration = VariableDeclaration SourceLocation [VariableDeclarator] DeclarationKind
+                         deriving (Eq, Show)
 
 instance FromJSON VariableDeclaration where
   parseJSON = cases [node "VariableDeclaration" VariableDeclaration <*>
                      "declarations" <*> "kind"]
 
 data VariableDeclarator = VariableDeclarator SourceLocation Pattern (Maybe Expression)
+                        deriving (Eq, Show)
 
 instance FromJSON VariableDeclarator where
   parseJSON = cases [node "VariableDeclarator" VariableDeclarator <*> "id" <*> "init"]
 
 data DeclarationKind = DVar | DLet | DConst
+                     deriving (Eq, Show)
 
 instance FromJSON DeclarationKind where
   parseJSON (String t) = pure $ case t of
@@ -234,6 +241,7 @@ data Expression = ThisExpression SourceLocation
                 | LetExpression SourceLocation [VariableDeclarator] Expression
                 | LiteralExpression SourceLocation Literal
                 | IdentifierExpression SourceLocation Identifier
+                deriving (Eq, Show)
                   
 
 instance FromJSON Expression where
@@ -250,11 +258,13 @@ instance FromJSON Expression where
     ]
 
 data Property = Property SourceLocation (Either Literal Identifier) Expression PropertyKind
+              deriving (Eq, Show)
 
 instance FromJSON Property where
   parseJSON = cases [node "Property" Property <*> "key" <*> "value" <*> "kind"]
 
 data PropertyKind = PInit | PGet | PSet
+                  deriving (Eq, Show)
 
 instance FromJSON PropertyKind where
   parseJSON (String t) = pure $ case t of
@@ -266,6 +276,7 @@ instance FromJSON PropertyKind where
 data Pattern = ObjectPattern SourceLocation [PatternProperty]
              | ArrayPattern SourceLocation [Maybe Pattern]
              | IdentifierPattern SourceLocation Identifier
+             deriving (Eq, Show)
 
 instance FromJSON Pattern where
   parseJSON = cases
@@ -275,6 +286,7 @@ instance FromJSON Pattern where
               ]
 
 data PatternProperty = PatternProperty (Either Literal Identifier) Pattern
+                     deriving (Eq, Show)
 
 instance FromJSON PatternProperty where
   parseJSON (Object o) = PatternProperty <$>
@@ -283,21 +295,25 @@ instance FromJSON PatternProperty where
   parseJSON _          = mzero
 
 data SwitchCase = SwitchCase SourceLocation (Maybe Expression) [Statement]
+                deriving (Eq, Show)
 
 instance FromJSON SwitchCase where
   parseJSON = cases [node "SwitchCase" SwitchCase <*> "test" <*> "consequent"]
 
 data CatchClause = CatchClause SourceLocation Pattern (Maybe Expression) [Statement]
+                 deriving (Eq, Show)
 
 instance FromJSON CatchClause where
   parseJSON = cases [node "CatchClause" CatchClause <*> "param" <*> "guard" <*> "body"]
 
 data ComprehensionBlock = ComprehensionBlock SourceLocation Pattern Expression Bool
+                        deriving (Eq, Show)
 
 instance FromJSON ComprehensionBlock where
   parseJSON = cases [node "ComprehensionBlock" ComprehensionBlock <*> "left" <*> "right" <*> "each"]
 
 data Identifier = Identifier SourceLocation Text
+                deriving (Eq, Show)
 
 instance FromJSON Identifier where
   parseJSON = cases [node "Identifier" Identifier <*> "name"]
@@ -307,6 +323,7 @@ data Literal = LString SourceLocation Text
              | LNull SourceLocation
              | LNumber SourceLocation Scientific
  --          | RegExp SourceLocation String
+             deriving (Eq, Show)
 
 instance FromJSON Literal where
   parseJSON (Object o) = do ty <- getType o
@@ -330,6 +347,7 @@ enum m = let mp = Map.fromList m
                    _        -> mzero
 
 data UnaryOperator = (:.-:) | (:.+:) | (:!:) | (:~:) | Typeof | Void | Delete
+                   deriving (Eq, Show)
 
 instance FromJSON UnaryOperator where
   parseJSON = enum [("-", (:.-:)), ("+", (:.+:)), ("!", (:!:)), ("~", (:~:)), ("typeof", Typeof), ("void", Void), ("delete", Delete)]
@@ -338,22 +356,26 @@ data BinaryOperator = (:==:) | (:!=:) | (:===:) | (:!==:)
                     | (:<:) | (:<=:) | (:>:) | (:>=:) | (:<<:) | (:>>:)
                     | (:>>>:) | (:+:) | (:-:) | (:*:) | (:/:)
                     | (:%:) | (:|:) | (:^:) | (:&:) | In | Instanceof | (:..:)
+                    deriving (Eq, Show)
 
 instance FromJSON BinaryOperator where
   parseJSON = enum [("==", (:==:)), ("!=", (:!=:)), ("===", (:===:)), ("!==", (:!==:)), ("<", (:<:)), ("<=", (:<=:)), (">", (:>:)), (">=", (:>=:)), ("<<", (:<<:)), (">>", (:>>:)), (">>>", (:>>>:)), ("+", (:+:)), ("-", (:-:)), ("*", (:*:)), ("/", (:/:)), ("%", (:%:)), ("|", (:|:)), ("^", (:^:)), ("&", (:&:)), ("in", In), ("instanceof", Instanceof), ("..", (:..:))]
 
 data LogicalOperator = (:||:) | (:&&:)
+                     deriving (Eq, Show)
 
 instance FromJSON LogicalOperator where
   parseJSON = enum [("||", (:||:)), ("&&", (:&&:))]
 
 data AssignmentOperator = (:=:) | (:+=:) | (:-=:) | (:*=:) | (:/=:) | (:%=:)
                         | (:<<=:) | (:>>=:) | (:>>>=:) | (:|=:) | (:^=:) | (:&=:)
+                        deriving (Eq, Show)
 
 instance FromJSON AssignmentOperator where
   parseJSON = enum [("=", (:=:)), ("+=", (:+=:)), ("-=", (:-=:)), ("*=", (:*=:)), ("/=", (:/=:)), ("%=", (:%=:)), ("<<=", (:<<=:)), (">>=", (:>>=:)), (">>>=", (:>>>=:)), ("|=", (:|=:)), ("^=", (:^=:)), ("&=", (:&=:))]
 
 data UpdateOperator = (:++:) | (:--:)
-
+                    deriving (Eq, Show)
+                             
 instance FromJSON UpdateOperator where
   parseJSON = enum [("++", (:++:)), ("--", (:--:))]
