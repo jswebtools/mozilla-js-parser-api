@@ -19,6 +19,10 @@ import Data.Scientific (Scientific)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 
+import Debug.Trace(trace, traceShowId)
+trace' x = trace (show x) x
+
+
 -- low level types
 
 data SourceLocation = SourceLocation {source :: Maybe String
@@ -60,7 +64,7 @@ cases nds = \v -> case v of
   Object o -> do type_ <- getType o
                  case matchType type_ nds of
                    Just node -> runBuilder (nodeBuilder node) o
-                   Nothing   -> fail "Unexpected node type"
+                   Nothing   -> fail $ "Unexpected node type: " ++ (show type_) ++ " options were: " ++ (Data.String.unwords $ Prelude.map nodeType nds)
   _        -> typeMismatch "Node" v
 
 node :: String -> (SourceLocation -> f) -> Node f
@@ -95,16 +99,23 @@ getType o = o .: "type"
 getLocation :: Builder SourceLocation
 getLocation = ask >>= \o -> lift (o .: "loc")
   
-data Program = Program SourceLocation [Statement]
+data Program = Program { loc :: SourceLocation, body :: [Statement] }
 
 instance FromJSON Program where
-  parseJSON = cases [node "Program" Program <*> "body"]
+  parseJSON (Object o') = p' o'
+    where p' o = Program <$>
+               o .: "loc" <*>
+               o .: "body" --cases [node "Program" Program <*> "body"]
+  parseJSON _ = mzero
   
 data Function = Function {funcId :: Maybe Identifier
                          ,funcParams :: [Pattern]
                          ,funcDefaults :: [Expression]
                          ,funcRest :: Maybe Identifier
-                         ,funcBody :: Either [Statement] Expression
+                          -- spidermonkey supports closure expressions, which means body could theoretically also be an Expression
+                          -- We don't support it because it isn't standard in ES5.
+                          -- See: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Parser_API#Functions
+                         ,funcBody :: [Statement] 
                          ,funcGenerator :: Bool}
 
 instance FromJSON Function where
@@ -140,30 +151,31 @@ data Statement = EmptyStatement SourceLocation
                | VariableDeclarationStatement SourceLocation VariableDeclaration
 
 instance FromJSON Statement where
-  parseJSON =
-    cases
-    [node "EmptyStatement" EmptyStatement
-    ,node "BlockStatement" BlockStatement <*> "body"
-    ,node "ExpressionStatement" BlockStatement <*> "expression"
-    ,node "IfStatement" IfStatement <*> "text" <*> "consequent" <*> "alternate"
-    ,node "LabeledStatement" LabeledStatement <*> "label" <*> "body"
-    ,node "BreakStatement" BreakStatement <*> "label"
-    ,node "ContinueStatement" ContinueStatement <*> "label"
-    ,node "WithStatement" WithStatement <*> "object" <*> "body"
-    ,node "SwitchStatement" SwitchStatement <*> "discriminant" <*> "cases" <*> "lexical"
-    ,node "ReturnStatement" ReturnStatement <*> "argument"
-    ,node "ThrowStatement" ThrowStatement <*> "argument"
-    ,node "TryStatement" TryStatement <*> "block" <*> "handler" <*> "guardedHandlers" <*> "finalizer"
-    ,node "WhileStatement" WhileStatement <*> "test" <*> "body"
-    ,node "DoWhileStatement" DoWhileStatement <*> "body" <*> "test"
-    ,node "ForStatement" ForStatement <*> "init" <*> "test" <*> "update" <*> "body"
-    ,node "ForInStatement" ForInStatement <*> "left" <*> "right" <*> "body" <*> "each"
-    ,node "ForOfStatement" ForOfStatement <*> "left" <*> "right" <*> "body"
-    ,node "LetStatement" LetStatement <*> "head" <*> "body"
-    ,node "DebuggerStatement" DebuggerStatement
-    ,node "FunctionDeclaration" FunctionDeclarationStatement <*> liftJSON
-    ,node "VariableDeclaration" VariableDeclarationStatement <*> liftJSON
-    ]
+  parseJSON = parse'
+    where parse' =
+            cases
+            [node "EmptyStatement" EmptyStatement
+            ,node "BlockStatement" BlockStatement <*> "body"
+            ,node "ExpressionStatement" ExpressionStatement <*> "expression"
+            ,node "IfStatement" IfStatement <*> "text" <*> "consequent" <*> "alternate"
+            ,node "LabeledStatement" LabeledStatement <*> "label" <*> "body"
+            ,node "BreakStatement" BreakStatement <*> "label"
+            ,node "ContinueStatement" ContinueStatement <*> "label"
+            ,node "WithStatement" WithStatement <*> "object" <*> "body"
+            ,node "SwitchStatement" SwitchStatement <*> "discriminant" <*> "cases" <*> "lexical"
+            ,node "ReturnStatement" ReturnStatement <*> "argument"
+            ,node "ThrowStatement" ThrowStatement <*> "argument"
+            ,node "TryStatement" TryStatement <*> "block" <*> "handler" <*> "guardedHandlers" <*> "finalizer"
+            ,node "WhileStatement" WhileStatement <*> "test" <*> "body"
+            ,node "DoWhileStatement" DoWhileStatement <*> "body" <*> "test"
+            ,node "ForStatement" ForStatement <*> "init" <*> "test" <*> "update" <*> "body"
+            ,node "ForInStatement" ForInStatement <*> "left" <*> "right" <*> "body" <*> "each"
+            ,node "ForOfStatement" ForOfStatement <*> "left" <*> "right" <*> "body"
+            ,node "LetStatement" LetStatement <*> "head" <*> "body"
+            ,node "DebuggerStatement" DebuggerStatement
+            ,node "FunctionDeclaration" FunctionDeclarationStatement <*> liftJSON
+            ,node "VariableDeclaration" VariableDeclarationStatement <*> liftJSON
+            ]
                  
 data ForInit = VarInit VariableDeclaration
              | ExprInit Expression
@@ -220,15 +232,21 @@ data Expression = ThisExpression SourceLocation
                 | GeneratorExpression SourceLocation Expression [ComprehensionBlock] (Maybe Expression)
                 | GraphExpression SourceLocation Word32 Literal
                 | LetExpression SourceLocation [VariableDeclarator] Expression
+                | LiteralExpression SourceLocation Literal
+                | IdentifierExpression SourceLocation Identifier
+                  
 
 instance FromJSON Expression where
   parseJSON =
     cases
     [node "ThisExpression" ThisExpression
+    ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
     ,node "ArrayExpression" ArrayExpression <*> "elements"
     ,node "ObjectExpression" ObjectExpression <*> "properties"
     ,node "FunctionExpression" FunctionExpression <*> liftJSON
     ,node "ArrowExpression" ArrowExpression <*> liftJSON
+    ,node "Literal" LiteralExpression <*> liftJSON
+    ,node "Identifier" IdentifierExpression <*> liftJSON
     ]
 
 data Property = Property SourceLocation (Either Literal Identifier) Expression PropertyKind
