@@ -7,7 +7,7 @@ synopsis:            Parser, printer and AST for the Mozilla SpiderMonkey parser
 -- description:         
 license:             BSD3
 license-file:        LICENSE
-author:              Andrey Chudnov
+author:              Andrey Chudnov, Noam Lewis
 maintainer:          oss@chudnov.com
 -- copyright:           
 category:            Language
