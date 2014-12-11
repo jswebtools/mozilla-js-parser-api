@@ -19,10 +19,6 @@ import Data.Scientific (Scientific)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 
-import Debug.Trace(trace, traceShowId)
-trace' x = trace (show x) x
-
-
 -- low level types
 
 data SourceLocation = SourceLocation {source :: Maybe String
@@ -116,7 +112,7 @@ data Function = Function {funcId :: Maybe Identifier
                           -- spidermonkey supports closure expressions, which means body could theoretically also be an Expression
                           -- We don't support it because it isn't standard in ES5.
                           -- See: https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Parser_API#Functions
-                         ,funcBody :: [Statement] 
+                         ,funcBody :: Statement 
                          ,funcGenerator :: Bool}
               deriving (Eq, Show)
 
@@ -141,7 +137,7 @@ data Statement = EmptyStatement SourceLocation
                | SwitchStatement SourceLocation Expression [SwitchCase] Bool
                | ReturnStatement SourceLocation (Maybe Expression)
                | ThrowStatement SourceLocation Expression
-               | TryStatement SourceLocation [Statement] (Maybe CatchClause) [CatchClause] (Maybe [Statement])
+               | TryStatement SourceLocation Statement (Maybe CatchClause) [CatchClause] (Maybe Statement)
                | WhileStatement SourceLocation Expression Statement
                | DoWhileStatement SourceLocation Statement Expression
                | ForStatement SourceLocation ForInit Expression Expression Statement
@@ -234,11 +230,14 @@ data Expression = ThisExpression SourceLocation
                   -- ^ no "computed: boolean" because it is uniquely
                   -- determined from the value of "property:
                   -- Identifier | Expression"
-                | YieldExpression SourceLocation (Maybe Expression)
-                | ComprehensionExpression SourceLocation Expression [ComprehensionBlock] (Maybe Expression)
-                | GeneratorExpression SourceLocation Expression [ComprehensionBlock] (Maybe Expression)
-                | GraphExpression SourceLocation Word32 Literal
-                | LetExpression SourceLocation [VariableDeclarator] Expression
+                  
+                  -- The following expression types are spidermonkey-specific, so althought it would be nice to parse
+                  -- them, they are not supposed to show up in valid ecma262 syntax.
+--                | YieldExpression SourceLocation (Maybe Expression)
+--                | ComprehensionExpression SourceLocation Expression [ComprehensionBlock] (Maybe Expression)
+--                | GeneratorExpression SourceLocation Expression [ComprehensionBlock] (Maybe Expression)
+--                | GraphExpression SourceLocation Word32 Literal
+--                | LetExpression SourceLocation [VariableDeclarator] Expression
                 | LiteralExpression SourceLocation Literal
                 | IdentifierExpression SourceLocation Identifier
                 deriving (Eq, Show)
@@ -248,11 +247,20 @@ instance FromJSON Expression where
   parseJSON =
     cases
     [node "ThisExpression" ThisExpression
-    ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
     ,node "ArrayExpression" ArrayExpression <*> "elements"
     ,node "ObjectExpression" ObjectExpression <*> "properties"
     ,node "FunctionExpression" FunctionExpression <*> liftJSON
     ,node "ArrowExpression" ArrowExpression <*> liftJSON
+    ,node "SequenceExpression" SequenceExpression <*> "expressions"
+    ,node "UnaryExpression" UnaryExpression <*> "operator" <*> "prefix" <*> "argument"
+    ,node "BinaryExpression" BinaryExpression <*> "operator" <*> "left" <*> "right"
+    ,node "AssignmentExpression"  AssignmentExpression <*> "operator" <*> "left" <*> "right"
+    ,node "UpdateExpression" UpdateExpression <*> "operator" <*> "argument" <*> "prefix"
+    ,node "LogicalExpression" LogicalExpression <*> "operator" <*> "left" <*> "right"
+    ,node "ConditionalExpression" ConditionalExpression <*> "test" <*> "alternate" <*> "consequent"
+    ,node "NewExpression" NewExpression <*> "callee" <*> "arguments"
+    ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
+    ,node "MemberExpression" MemberExpression <*> "object" <*> "property" -- TODO parse the "computed" field and use Identifier or Expression for "property"
     ,node "Literal" LiteralExpression <*> liftJSON
     ,node "Identifier" IdentifierExpression <*> liftJSON
     ]
@@ -294,13 +302,13 @@ instance FromJSON PatternProperty where
                          o .: "value"
   parseJSON _          = mzero
 
-data SwitchCase = SwitchCase SourceLocation (Maybe Expression) [Statement]
+data SwitchCase = SwitchCase SourceLocation (Maybe Expression) Statement
                 deriving (Eq, Show)
 
 instance FromJSON SwitchCase where
   parseJSON = cases [node "SwitchCase" SwitchCase <*> "test" <*> "consequent"]
 
-data CatchClause = CatchClause SourceLocation Pattern (Maybe Expression) [Statement]
+data CatchClause = CatchClause SourceLocation Pattern (Maybe Expression) Statement
                  deriving (Eq, Show)
 
 instance FromJSON CatchClause where
