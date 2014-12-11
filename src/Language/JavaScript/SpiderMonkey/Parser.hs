@@ -7,17 +7,14 @@ import Data.Aeson
 import Data.Aeson.Types
 import Data.Aeson.TH
 import Data.Int
-import Data.Word
 import Control.Applicative
-import Data.Monoid
+import Data.Monoid()
 import Control.Monad
 import Data.String
 import Data.Text hiding (filter)
 import Control.Monad.Reader
-import Control.Monad.Identity
 import Data.Scientific (Scientific)
 import qualified Data.Map.Strict as Map
-import Data.Map.Strict (Map)
 
 -- low level types
 
@@ -46,7 +43,7 @@ data Node a = Node {nodeType    :: String
                    ,nodeBuilder :: Builder a}
 
 instance Functor Node where
-  fmap f node = node {nodeBuilder = f <$> nodeBuilder node}
+  fmap f node' = node' {nodeBuilder = f <$> nodeBuilder node'}
 
 instance Applicative Node where
   pure x      = Node {nodeType = "", nodeBuilder = pure x}
@@ -59,7 +56,7 @@ cases :: [Node a] -> (Value -> Parser a)
 cases nds = \v -> case v of
   Object o -> do type_ <- getType o
                  case matchType type_ nds of
-                   Just node -> runBuilder (nodeBuilder node) o
+                   Just node' -> runBuilder (nodeBuilder node') o
                    Nothing   -> fail $ "Unexpected node type: " ++ (show type_) ++ " options were: " ++ (Data.String.unwords $ Prelude.map nodeType nds)
   _        -> typeMismatch "Node" v
 
@@ -336,13 +333,13 @@ data Literal = LString SourceLocation Text
 instance FromJSON Literal where
   parseJSON (Object o) = do ty <- getType o
                             unless (ty == "Literal") mzero
-                            loc <- o .: "loc"
+                            loc' <- o .: "loc"
                             v <- o .: "value"
                             return $ case v of
-                             String s -> LString loc s
-                             Bool   b -> LBool loc b
-                             Null     -> LNull loc
-                             Number n -> LNumber loc n
+                             String s -> LString loc' s
+                             Bool   b -> LBool loc' b
+                             Null     -> LNull loc'
+                             Number n -> LNumber loc' n
                              
   parseJSON _ = mzero
 
