@@ -7,19 +7,24 @@ synopsis:            Parser, printer and AST for the Mozilla SpiderMonkey parser
 -- description:         
 license:             BSD3
 license-file:        LICENSE
-author:              Andrey Chudnov
+author:              Andrey Chudnov, Noam Lewis
 maintainer:          oss@chudnov.com
 -- copyright:           
 category:            Language
 build-type:          Simple
 cabal-version:       >=1.8
 
+Flag BuildTestTools
+  Description: Build executables useful only for testing
+  Default:     False
+
+
 library
   hs-source-dirs:    src
   exposed-modules:   Language.JavaScript.SpiderMonkey.Parser
   -- other-modules:       
   build-depends:       base >= 4.6 && < 5
-                     , aeson == 0.8.*
+                     , aeson
                      , mtl
                      , scientific >= 0.2.0.2
                      , text
@@ -35,6 +40,24 @@ test-suite test
                      , mozilla-js-parser-api
                      , mtl
                      , scientific >= 0.2.0.2
-                     , tasty == 0.2.*
-                     , tasty-hunit == 0.2.*
+                     , tasty
+                     , tasty-hunit
                      , text
+
+executable test-parser
+  If flag(BuildTestTools)
+    Buildable: True
+  Else
+    Buildable: False
+  main-is: test/TestParser.hs
+  build-depends:       base >= 4.6 && < 5
+                     , aeson
+                     , bytestring
+                     , mozilla-js-parser-api
+                     , mtl
+                     , scientific >= 0.2.0.2
+                     , tasty
+                     , tasty-hunit
+                     , text
+                     , unordered-containers
+
