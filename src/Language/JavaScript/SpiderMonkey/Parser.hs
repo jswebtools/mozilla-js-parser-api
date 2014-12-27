@@ -137,7 +137,7 @@ data Statement = EmptyStatement SourceLocation
                | TryStatement SourceLocation Statement (Maybe CatchClause) [CatchClause] (Maybe Statement)
                | WhileStatement SourceLocation Expression Statement
                | DoWhileStatement SourceLocation Statement Expression
-               | ForStatement SourceLocation ForInit Expression Expression Statement
+               | ForStatement SourceLocation ForInit (Maybe Expression) (Maybe Expression) Statement
                | ForInStatement SourceLocation (Either VariableDeclaration Expression) Expression Statement Bool
                | ForOfStatement SourceLocation (Either VariableDeclarator Expression) Expression Statement
                | LetStatement SourceLocation [VariableDeclarator] Statement
@@ -299,7 +299,7 @@ instance FromJSON PatternProperty where
                          o .: "value"
   parseJSON _          = mzero
 
-data SwitchCase = SwitchCase SourceLocation (Maybe Expression) Statement
+data SwitchCase = SwitchCase SourceLocation (Maybe Expression) [Statement]
                 deriving (Eq, Show)
 
 instance FromJSON SwitchCase where
