@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.JavaScript.SpiderMonkey.Parser where
 
@@ -15,6 +16,7 @@ import Data.Text hiding (filter)
 import Control.Monad.Reader
 import Data.Scientific (Scientific)
 import qualified Data.Map.Strict as Map
+import Prelude hiding (either)
 
 -- low level types
 
@@ -121,8 +123,17 @@ instance FromJSON Function where
                          o .: "rest" <*>
                          o .: "body" <*>
                          o .: "generator"
-  parseJSON _ = mzero 
-                         
+  parseJSON _ = mzero
+
+-- | The Aeson instance for Either is pretty inuntuitive and
+-- unimaginative, so we need to circumvent that
+either :: forall a b. (FromJSON a, FromJSON b) => Text -> Node (Either a b)
+either name = Node {nodeType = ""
+                   ,nodeBuilder = do o <- ask
+                                     lift ((Left <$> (o .: name :: Parser a)) <|>
+                                           (Right <$> (o .: name :: Parser b)))
+                   }
+
 data Statement = EmptyStatement SourceLocation
                | BlockStatement SourceLocation [Statement]
                | ExpressionStatement SourceLocation Expression
@@ -153,7 +164,7 @@ instance FromJSON Statement where
             [node "EmptyStatement" EmptyStatement
             ,node "BlockStatement" BlockStatement <*> "body"
             ,node "ExpressionStatement" ExpressionStatement <*> "expression"
-            ,node "IfStatement" IfStatement <*> "text" <*> "consequent" <*> "alternate"
+            ,node "IfStatement" IfStatement <*> "test" <*> "consequent" <*> "alternate"
             ,node "LabeledStatement" LabeledStatement <*> "label" <*> "body"
             ,node "BreakStatement" BreakStatement <*> "label"
             ,node "ContinueStatement" ContinueStatement <*> "label"
@@ -165,8 +176,8 @@ instance FromJSON Statement where
             ,node "WhileStatement" WhileStatement <*> "test" <*> "body"
             ,node "DoWhileStatement" DoWhileStatement <*> "body" <*> "test"
             ,node "ForStatement" ForStatement <*> "init" <*> "test" <*> "update" <*> "body"
-            ,node "ForInStatement" ForInStatement <*> "left" <*> "right" <*> "body" <*> "each"
-            ,node "ForOfStatement" ForOfStatement <*> "left" <*> "right" <*> "body"
+            ,node "ForInStatement" ForInStatement <*> either "left" <*> "right" <*> "body" <*> "each"
+            ,node "ForOfStatement" ForOfStatement <*> either "left" <*> "right" <*> "body"
             ,node "LetStatement" LetStatement <*> "head" <*> "body"
             ,node "DebuggerStatement" DebuggerStatement
             ,node "FunctionDeclaration" FunctionDeclarationStatement <*> liftJSON
@@ -257,7 +268,7 @@ instance FromJSON Expression where
     ,node "ConditionalExpression" ConditionalExpression <*> "test" <*> "alternate" <*> "consequent"
     ,node "NewExpression" NewExpression <*> "callee" <*> "arguments"
     ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
-    ,node "MemberExpression" MemberExpression <*> "object" <*> "property" -- TODO parse the "computed" field and use Identifier or Expression for "property"
+    ,node "MemberExpression" MemberExpression <*> "object" <*> either "property" -- TODO parse the "computed" field and use Identifier or Expression for "property"
     ,node "Literal" LiteralExpression <*> liftJSON
     ,node "Identifier" IdentifierExpression <*> liftJSON
     ]
@@ -266,7 +277,7 @@ data Property = Property SourceLocation (Either Literal Identifier) Expression P
               deriving (Eq, Show)
 
 instance FromJSON Property where
-  parseJSON = cases [node "Property" Property <*> "key" <*> "value" <*> "kind"]
+  parseJSON = cases [node "Property" Property <*> either "key" <*> "value" <*> "kind"]
 
 data PropertyKind = PInit | PGet | PSet
                   deriving (Eq, Show)
@@ -295,7 +306,8 @@ data PatternProperty = PatternProperty (Either Literal Identifier) Pattern
 
 instance FromJSON PatternProperty where
   parseJSON (Object o) = PatternProperty <$>
-                         o .: "key" <*>
+                         ((Left <$> (o .: "key" :: Parser Literal)) <|>
+                          (Right <$> (o .: "key" :: Parser Identifier))) <*>
                          o .: "value"
   parseJSON _          = mzero
 
