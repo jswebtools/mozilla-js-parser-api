@@ -38,3 +38,14 @@ test-suite test
                      , tasty
                      , tasty-hunit
                      , text
+
+executable testparser
+  hs-source-dirs:    test
+  main-is:           TestParser.hs
+  build-depends:       base >= 4.6 && < 5
+                     , aeson
+                     , bytestring
+                     , mozilla-js-parser-api
+                     , mtl
+                     , scientific >= 0.2.0.2
+                     , text
