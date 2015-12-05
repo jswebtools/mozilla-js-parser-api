@@ -234,10 +234,7 @@ data Expression = ThisExpression SourceLocation
                 | ConditionalExpression SourceLocation Expression Expression Expression
                 | NewExpression SourceLocation Expression [Expression]
                 | CallExpression SourceLocation Expression [Expression]
-                | MemberExpression SourceLocation Expression (Either Identifier Expression)
-                  -- ^ no "computed: boolean" because it is uniquely
-                  -- determined from the value of "property:
-                  -- Identifier | Expression"
+                | MemberExpression SourceLocation Expression (Either Identifier Expression) Bool
                   
                   -- The following expression types are spidermonkey-specific, so althought it would be nice to parse
                   -- them, they are not supposed to show up in valid ecma262 syntax.
@@ -268,7 +265,7 @@ instance FromJSON Expression where
     ,node "ConditionalExpression" ConditionalExpression <*> "test" <*> "alternate" <*> "consequent"
     ,node "NewExpression" NewExpression <*> "callee" <*> "arguments"
     ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
-    ,node "MemberExpression" MemberExpression <*> "object" <*> either "property" -- TODO parse the "computed" field and use Identifier or Expression for "property"
+    ,node "MemberExpression" MemberExpression <*> "object" <*> either "property" <*> "computed"
     ,node "Literal" LiteralExpression <*> liftJSON
     ,node "Identifier" IdentifierExpression <*> liftJSON
     ]
