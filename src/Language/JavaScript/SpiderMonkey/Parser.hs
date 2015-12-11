@@ -191,9 +191,8 @@ data ForInit = VarInit VariableDeclaration
 
 instance FromJSON ForInit where
   parseJSON v = case v of
-    (Object _)-> parseJSON v >>= \e -> case e of
-                  Left vd  -> return $ VarInit vd
-                  Right ex -> return $ ExprInit ex
+    (Object _)->  (VarInit <$> (parseJSON v :: Parser VariableDeclaration))
+              <|> (ExprInit <$> (parseJSON v :: Parser Expression))
     Null      -> return $ NoInit
                    
 
