@@ -262,7 +262,7 @@ instance FromJSON Expression where
     ,node "AssignmentExpression"  AssignmentExpression <*> "operator" <*> "left" <*> "right"
     ,node "UpdateExpression" UpdateExpression <*> "operator" <*> "argument" <*> "prefix"
     ,node "LogicalExpression" LogicalExpression <*> "operator" <*> "left" <*> "right"
-    ,node "ConditionalExpression" ConditionalExpression <*> "test" <*> "alternate" <*> "consequent"
+    ,node "ConditionalExpression" ConditionalExpression <*> "test" <*> "consequent" <*> "alternate"
     ,node "NewExpression" NewExpression <*> "callee" <*> "arguments"
     ,node "CallExpression" CallExpression <*> "callee" <*> "arguments"
     ,node "MemberExpression" MemberExpression <*> "object" <*> either "property" <*> "computed"
